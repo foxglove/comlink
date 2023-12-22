@@ -468,27 +468,30 @@ function createProxy<T>(
 ): Remote<T> {
   let isProxyReleased = false;
 
-  const pendingListeners: PendingListenersMap = new Map();
+  if (!ep.pendingListeners) {
+    const pendingListeners: PendingListenersMap = new Map();
+    ep.pendingListeners = pendingListeners;
 
-  ep.addEventListener("message", function messageHandler(
-    ev: MessageEvent<WireValue>
-  ) {
-    const id = ev.data.id;
-    if (!id) {
-      return;
-    }
+    ep.addEventListener("message", function messageHandler(
+      ev: MessageEvent<WireValue>
+    ) {
+      const id = ev.data.id;
+      if (!id) {
+        return;
+      }
 
-    const callback = pendingListeners.get(id);
-    if (!callback) {
-      return;
-    }
+      const callback = pendingListeners.get(id);
+      if (!callback) {
+        return;
+      }
 
-    try {
-      callback(ev.data);
-    } finally {
-      pendingListeners.delete(id);
-    }
-  } as any);
+      try {
+        callback(ev.data);
+      } finally {
+        pendingListeners.delete(id);
+      }
+    } as any);
+  }
 
   const proxy = new Proxy(target, {
     get(_target, prop) {
@@ -504,7 +507,7 @@ function createProxy<T>(
         if (path.length === 0) {
           return { then: () => proxy };
         }
-        const r = requestResponseMessage(ep, pendingListeners, {
+        const r = requestResponseMessage(ep, {
           type: MessageType.GET,
           path: path.map((p) => p.toString()),
         }).then(fromWireValue);
@@ -519,7 +522,6 @@ function createProxy<T>(
       const [value, transferables] = toWireValue(rawValue);
       return requestResponseMessage(
         ep,
-        pendingListeners,
         {
           type: MessageType.SET,
           path: [...path, prop].map((p) => p.toString()),
@@ -532,7 +534,7 @@ function createProxy<T>(
       throwIfProxyReleased(isProxyReleased);
       const last = path[path.length - 1];
       if ((last as any) === createEndpoint) {
-        return requestResponseMessage(ep, pendingListeners, {
+        return requestResponseMessage(ep, {
           type: MessageType.ENDPOINT,
         }).then(fromWireValue);
       }
@@ -543,7 +545,6 @@ function createProxy<T>(
       const [argumentList, transferables] = processArguments(rawArgumentList);
       return requestResponseMessage(
         ep,
-        pendingListeners,
         {
           type: MessageType.APPLY,
           path: path.map((p) => p.toString()),
@@ -557,7 +558,6 @@ function createProxy<T>(
       const [argumentList, transferables] = processArguments(rawArgumentList);
       return requestResponseMessage(
         ep,
-        pendingListeners,
         {
           type: MessageType.CONSTRUCT,
           path: path.map((p) => p.toString()),
@@ -637,13 +637,12 @@ function fromWireValue(value: WireValue): any {
 
 function requestResponseMessage(
   ep: Endpoint,
-  pendingListeners: PendingListenersMap,
   msg: Message,
   transfers?: Transferable[]
 ): Promise<WireValue> {
   return new Promise((resolve) => {
     const id = Math.trunc(Math.random() * Number.MAX_SAFE_INTEGER).toString();
-    pendingListeners.set(id, resolve);
+    ep.pendingListeners?.set(id, resolve);
     if (ep.start) {
       ep.start();
     }

@@ -30,6 +30,11 @@ export interface Endpoint extends EventSource {
   postMessage(message: any, transfer?: Transferable[]): void;
 
   start?: () => void;
+
+  pendingListeners?: Map<
+    string,
+    (value: WireValue | PromiseLike<WireValue>) => void
+  >;
 }
 
 export const enum WireValueType {
