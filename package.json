@@ -7,6 +7,7 @@
   "types": "dist/umd/comlink.d.ts",
   "sideEffects": false,
   "scripts": {
+    "prepack": "npm run build",
     "build": "rollup -c",
     "test:unit": "karma start",
     "test:node": "mocha ./tests/node/main.mjs",
