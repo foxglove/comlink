@@ -25,4 +25,32 @@ describe("node", () => {
       expect(await otherProxy(20, 1)).to.equal(21);
     });
   });
+
+  describe("Comlink across workers (wrapped object)", function () {
+    beforeEach(function () {
+      this.worker = new Worker("./tests/node/worker-obj.mjs");
+    });
+
+    afterEach(function () {
+      this.worker.terminate();
+    });
+
+    it("can communicate", async function () {
+      const proxy = Comlink.wrap(nodeEndpoint(this.worker));
+      for (let i = 0; i < 10; i++) {
+        expect(await proxy.add(1, i)).to.equal(1 + i);
+        expect(await proxy.mult(1, i)).to.equal(1 * i);
+      }
+    });
+
+    it("can tunnels a new endpoint with createEndpoint", async function () {
+      const proxy = Comlink.wrap(nodeEndpoint(this.worker));
+      const otherEp = await proxy[Comlink.createEndpoint]();
+      const otherProxy = Comlink.wrap(otherEp);
+      for (let i = 0; i < 10; i++) {
+        expect(await otherProxy.add(1, i)).to.equal(1 + i);
+        expect(await otherProxy.mult(1, i)).to.equal(1 * i);
+      }
+    });
+  });
 });
