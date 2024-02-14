@@ -475,11 +475,16 @@ function createProxy<T>(
   target: object = function () {}
 ): Remote<T> {
   let isProxyReleased = false;
+  const propProxyCache : Map<(string | symbol), Remote<unknown>> = new Map();
   const proxy = new Proxy(target, {
     get(_target, prop) {
       throwIfProxyReleased(isProxyReleased);
       if (prop === releaseProxy) {
         return () => {
+          for (const subProxy of propProxyCache.values()) {
+            subProxy[releaseProxy]();
+          }
+          propProxyCache.clear();
           unregisterProxy(proxy);
           releaseEndpoint(ep);
           pendingListeners.clear();
@@ -496,7 +501,15 @@ function createProxy<T>(
         }).then(fromWireValue);
         return r.then.bind(r);
       }
-      return createProxy(ep, pendingListeners, [...path, prop]);
+
+      const cachedProxy = propProxyCache.get(prop);
+      if (cachedProxy) {
+        return cachedProxy;
+      }
+
+      const propProxy = createProxy(ep, pendingListeners, [...path, prop]);
+      propProxyCache.set(prop, propProxy);
+      return propProxy;
     },
     set(_target, prop, rawValue) {
       throwIfProxyReleased(isProxyReleased);
