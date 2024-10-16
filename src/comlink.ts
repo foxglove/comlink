@@ -107,7 +107,7 @@ export type LocalObject<T> = { [P in keyof T]: LocalProperty<T[P]> };
  */
 export interface ProxyMethods {
   [createEndpoint]: () => Promise<MessagePort>;
-  [releaseProxy]: () => void;
+  [releaseProxy]: () => Promise<void>;
 }
 
 /**
@@ -229,7 +229,10 @@ type SerializedThrownValue =
   | { isError: false; value: unknown };
 type PendingListenersMap = Map<
   string,
-  (value: WireValue | PromiseLike<WireValue>) => void
+  {
+    resolve: (value: WireValue | PromiseLike<WireValue>) => void;
+    reject: (reason?: any) => void;
+  }
 >;
 
 /**
@@ -396,7 +399,7 @@ function closeEndPoint(endpoint: Endpoint) {
 }
 
 export function wrap<T>(ep: Endpoint, target?: any): Remote<T> {
-  const pendingListeners : PendingListenersMap = new Map();
+  const pendingListeners: PendingListenersMap = new Map();
 
   ep.addEventListener("message", function handleMessage(ev: Event) {
     const { data } = ev as MessageEvent;
@@ -409,7 +412,7 @@ export function wrap<T>(ep: Endpoint, target?: any): Remote<T> {
     }
 
     try {
-      resolver(data);
+      resolver.resolve(data);
     } finally {
       pendingListeners.delete(data.id);
     }
@@ -424,8 +427,8 @@ function throwIfProxyReleased(isReleased: boolean) {
   }
 }
 
-function releaseEndpoint(ep: Endpoint) {
-  return requestResponseMessage(ep, new Map(), {
+function releaseEndpoint(ep: Endpoint, pendingListeners?: PendingListenersMap) {
+  return requestResponseMessage(ep, pendingListeners ?? new Map(), {
     type: MessageType.RELEASE,
   }).then(() => {
     closeEndPoint(ep);
@@ -475,20 +478,28 @@ function createProxy<T>(
   target: object = function () {}
 ): Remote<T> {
   let isProxyReleased = false;
-  const propProxyCache : Map<(string | symbol), Remote<unknown>> = new Map();
+  const propProxyCache: Map<string | symbol, Remote<unknown>> = new Map();
   const proxy = new Proxy(target, {
     get(_target, prop) {
       throwIfProxyReleased(isProxyReleased);
       if (prop === releaseProxy) {
         return () => {
-          for (const subProxy of propProxyCache.values()) {
-            subProxy[releaseProxy]();
-          }
-          propProxyCache.clear();
           unregisterProxy(proxy);
-          releaseEndpoint(ep);
-          pendingListeners.clear();
           isProxyReleased = true;
+
+          return releaseEndpoint(ep, pendingListeners).finally(() => {
+            // Reject pending promises as these can't be resolved anymore.
+            for (const { reject } of pendingListeners.values()) {
+              reject(new Error("Endpoint closed"));
+            }
+            pendingListeners.clear();
+
+            for (const subProxy of propProxyCache.values()) {
+              // The endpoint has been closed at this point so we don't wait for release of all subproxies.
+              void subProxy[releaseProxy]();
+            }
+            propProxyCache.clear();
+          });
         };
       }
       if (prop === "then") {
@@ -640,13 +651,12 @@ function requestResponseMessage(
   msg: Message,
   transfers?: Transferable[]
 ): Promise<WireValue> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const id = Math.trunc(Math.random() * Number.MAX_SAFE_INTEGER).toString();
-    pendingListeners.set(id, resolve);
+    pendingListeners.set(id, { resolve, reject });
     if (ep.start) {
       ep.start();
     }
     ep.postMessage({ id, ...msg }, transfers);
-});
+  });
 }
-
