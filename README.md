@@ -223,6 +223,18 @@ proxy[Comlink.releaseProxy]();
 
 If the browser supports the [WeakRef proposal], `[releaseProxy]()` will be called automatically when the proxy created by `wrap()` gets garbage collected.
 
+When using Comlink with a WebWorker, it is advised to only terminate the worker when the promise returned by `[releaseProxy]()` has resolved.
+
+```js
+const worker = new Worker(new URL("./worker.js", import.meta.url));
+const proxy = Comlink.wrap(worker);
+// ... use the proxy ...
+proxy[Comlink.releaseProxy]().then(() => {
+  // Only terminate the worker once the proxy has been released, to prevent memory leaks.
+  worker.terminat();
+});
+```
+
 ### `Comlink.finalizer`
 
 If an exposed object has a property `[Comlink.finalizer]`, the property will be invoked as a function when the proxy is being released. This can happen either through a manual invocation of `[releaseProxy]()` or automatically during garbage collection if the runtime supports the [WeakRef proposal] (see `Comlink.releaseProxy` above). Note that when the finalizer function is invoked, the endpoint is closed and no more communication can happen.
