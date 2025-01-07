@@ -396,7 +396,7 @@ function closeEndPoint(endpoint: Endpoint) {
 }
 
 export function wrap<T>(ep: Endpoint, target?: any): Remote<T> {
-  const pendingListeners : PendingListenersMap = new Map();
+  const pendingListeners: PendingListenersMap = new Map();
 
   ep.addEventListener("message", function handleMessage(ev: Event) {
     const { data } = ev as MessageEvent;
@@ -424,11 +424,12 @@ function throwIfProxyReleased(isReleased: boolean) {
   }
 }
 
-function releaseEndpoint(ep: Endpoint) {
-  return requestResponseMessage(ep, new Map(), {
+function releaseEndpoint(ep: Endpoint, pendingListeners?: PendingListenersMap) {
+  return requestResponseMessage(ep, pendingListeners || new Map(), {
     type: MessageType.RELEASE,
   }).then(() => {
     closeEndPoint(ep);
+    pendingListeners?.clear();
   });
 }
 
@@ -486,8 +487,7 @@ function createProxy<T>(
           }
           propProxyCache.clear();
           unregisterProxy(proxy);
-          releaseEndpoint(ep);
-          pendingListeners.clear();
+          releaseEndpoint(ep, pendingListeners);
           isProxyReleased = true;
         };
       }
@@ -647,6 +647,6 @@ function requestResponseMessage(
       ep.start();
     }
     ep.postMessage({ id, ...msg }, transfers);
-});
+  });
 }
 
