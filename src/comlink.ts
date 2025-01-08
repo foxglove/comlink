@@ -425,11 +425,10 @@ function throwIfProxyReleased(isReleased: boolean) {
 }
 
 function releaseEndpoint(ep: Endpoint, pendingListeners?: PendingListenersMap) {
-  return requestResponseMessage(ep, pendingListeners || new Map(), {
+  return requestResponseMessage(ep, pendingListeners ?? new Map(), {
     type: MessageType.RELEASE,
   }).then(() => {
     closeEndPoint(ep);
-    pendingListeners?.clear();
   });
 }
 
@@ -476,7 +475,7 @@ function createProxy<T>(
   target: object = function () {}
 ): Remote<T> {
   let isProxyReleased = false;
-  const propProxyCache : Map<(string | symbol), Remote<unknown>> = new Map();
+  const propProxyCache: Map<string | symbol, Remote<unknown>> = new Map();
   const proxy = new Proxy(target, {
     get(_target, prop) {
       throwIfProxyReleased(isProxyReleased);
@@ -487,7 +486,9 @@ function createProxy<T>(
           }
           propProxyCache.clear();
           unregisterProxy(proxy);
-          releaseEndpoint(ep, pendingListeners);
+          releaseEndpoint(ep, pendingListeners).finally(() => {
+            pendingListeners.clear();
+          });
           isProxyReleased = true;
         };
       }
@@ -649,4 +650,3 @@ function requestResponseMessage(
     ep.postMessage({ id, ...msg }, transfers);
   });
 }
-
