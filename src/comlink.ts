@@ -8,6 +8,7 @@ import {
   Endpoint,
   EventSource,
   Message,
+  MessageID,
   MessageType,
   PostMessageWithOrigin,
   WireValue,
@@ -228,13 +229,13 @@ type SerializedThrownValue =
   | { isError: true; value: Error }
   | { isError: false; value: unknown };
 type PendingListenersMap = Map<
-  number,
+  MessageID,
   (value: WireValue | PromiseLike<WireValue>) => void
 >;
 type EndpointWithPendingListeners = {
   endpoint: Endpoint;
   pendingListeners: PendingListenersMap;
-  nextRequestId: number;
+  nextRequestId: MessageID;
 };
 
 /**
