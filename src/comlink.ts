@@ -228,12 +228,13 @@ type SerializedThrownValue =
   | { isError: true; value: Error }
   | { isError: false; value: unknown };
 type PendingListenersMap = Map<
-  string,
+  number,
   (value: WireValue | PromiseLike<WireValue>) => void
 >;
 type EndpointWithPendingListeners = {
   endpoint: Endpoint;
   pendingListeners: PendingListenersMap;
+  nextRequestId: number;
 };
 
 /**
@@ -419,7 +420,7 @@ export function wrap<T>(ep: Endpoint, target?: any): Remote<T> {
     }
   });
 
-  return createProxy<T>({ endpoint: ep, pendingListeners }, [], target) as any;
+  return createProxy<T>({ endpoint: ep, pendingListeners, nextRequestId: 1 }, [], target) as any;
 }
 
 function throwIfProxyReleased(isReleased: boolean) {
@@ -650,8 +651,8 @@ function requestResponseMessage(
 ): Promise<WireValue> {
   const ep = epWithPendingListeners.endpoint;
   const pendingListeners = epWithPendingListeners.pendingListeners;
+  const id = epWithPendingListeners.nextRequestId++;
   return new Promise((resolve) => {
-    const id = Math.trunc(Math.random() * Number.MAX_SAFE_INTEGER).toString();
     pendingListeners.set(id, resolve);
     if (ep.start) {
       ep.start();
