@@ -40,13 +40,13 @@ export const enum WireValueType {
 }
 
 export interface RawWireValue {
-  id?: string;
+  id?: MessageID;
   type: WireValueType.RAW;
   value: {};
 }
 
 export interface HandlerWireValue {
-  id?: string;
+  id?: MessageID;
   type: WireValueType.HANDLER;
   name: string;
   value: unknown;
