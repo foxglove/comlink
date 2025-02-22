@@ -586,15 +586,14 @@ function myFlat<T>(arr: (T | T[])[]): T[] {
 }
 
 /** Get the first item of a tuple */
-function firstItem<O, T>(v: [O, T]): O {
+function firstItem<T>(v: [T, unknown]): T {
   return v[0]
 }
 
 /** Get the second item of a tuple */
-function secondItem<O, T>(v: [O, T]): T {
+function secondItem<T>(v: [unknown, T]): T {
   return v[1];
 }
-
 
 function processArguments(argumentList: any[]): [WireValue[], Transferable[]] {
   const processed = argumentList.map(toWireValue);
