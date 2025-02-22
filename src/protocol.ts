@@ -26,27 +26,50 @@ export interface PostMessageWithOrigin {
   ): void;
 }
 
+export const enum PostMessageType {
+  RAW = 1,
+  PROXY = 2,
+  THROW = 3,
+  HANDLER = 4,
+  GET = 5,
+  SET = 6,
+  APPLY = 7,
+  CONSTRUCT = 8,
+  ENDPOINT = 9,
+  RELEASE = 10,
+}
+
+
+export type MessageID = number;
+
+export type Payload = GetMessage | SetMessage | ApplyMessage | ConstructMessage | EndpointMessage | ReleaseMessage;
+export type PostMessageMessage = [MessageID, Payload];
+
 export interface Endpoint extends EventSource {
-  postMessage(message: WireValue, transfer?: Transferable[]): void;
+  postMessage(message: PostMessageMessage, transfer?: Transferable[]): void;
+
+  start?: () => void;
+}
+
+export interface ExposedEndpoint extends EventSource {
+  postMessage(message: [MessageID, WireValue], transfer?: Transferable[]): void;
 
   start?: () => void;
 }
 
 export const enum WireValueType {
-  RAW = "RAW",
-  PROXY = "PROXY",
-  THROW = "THROW",
-  HANDLER = "HANDLER",
+  RAW = 1,
+  PROXY = 2,
+  THROW = 3,
+  HANDLER = 4,
 }
 
 export interface RawWireValue {
-  id?: MessageID;
   type: WireValueType.RAW;
   value: {};
 }
 
 export interface HandlerWireValue {
-  id?: MessageID;
   type: WireValueType.HANDLER;
   name: string;
   value: unknown;
@@ -54,58 +77,35 @@ export interface HandlerWireValue {
 
 export type WireValue = RawWireValue | HandlerWireValue;
 
-export type MessageID = number;
-
-export const enum MessageType {
-  GET = "GET",
-  SET = "SET",
-  APPLY = "APPLY",
-  CONSTRUCT = "CONSTRUCT",
-  ENDPOINT = "ENDPOINT",
-  RELEASE = "RELEASE",
-}
-
 export interface GetMessage {
-  id?: MessageID;
-  type: MessageType.GET;
+  type: PostMessageType.GET;
   path: string[];
 }
 
 export interface SetMessage {
-  id?: MessageID;
-  type: MessageType.SET;
+  type: PostMessageType.SET;
   path: string[];
   value: WireValue;
 }
 
 export interface ApplyMessage {
-  id?: MessageID;
-  type: MessageType.APPLY;
+  type: PostMessageType.APPLY;
   path: string[];
   argumentList: WireValue[];
 }
 
 export interface ConstructMessage {
-  id?: MessageID;
-  type: MessageType.CONSTRUCT;
+  type: PostMessageType.CONSTRUCT;
   path: string[];
   argumentList: WireValue[];
 }
 
 export interface EndpointMessage {
-  id?: MessageID;
-  type: MessageType.ENDPOINT;
+  type: PostMessageType.ENDPOINT;
+  path?: never;
 }
 
 export interface ReleaseMessage {
-  id?: MessageID;
-  type: MessageType.RELEASE;
+  type: PostMessageType.RELEASE;
+  path?: never;
 }
-
-export type Message =
-  | GetMessage
-  | SetMessage
-  | ApplyMessage
-  | ConstructMessage
-  | EndpointMessage
-  | ReleaseMessage;

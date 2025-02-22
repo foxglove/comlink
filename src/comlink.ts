@@ -7,11 +7,13 @@
 import {
   Endpoint,
   EventSource,
-  Message,
-  MessageType,
+  Payload,
+  PostMessageMessage,
   PostMessageWithOrigin,
   WireValue,
+  PostMessageType,
   WireValueType,
+  ExposedEndpoint,
 } from "./protocol";
 export type { Endpoint };
 
@@ -301,7 +303,7 @@ function isAllowedOrigin(
 
 export function expose(
   obj: any,
-  ep: Endpoint = globalThis as any,
+  ep: ExposedEndpoint = globalThis as any,
   allowedOrigins: (string | RegExp)[] = ["*"]
 ) {
   ep.addEventListener("message", function callback(ev: MessageEvent) {
@@ -312,46 +314,49 @@ export function expose(
       console.warn(`Invalid origin '${ev.origin}' for comlink proxy`);
       return;
     }
-    const { id, type, path } = {
-      path: [] as string[],
-      ...(ev.data as Message),
-    };
-    const argumentList = (ev.data.argumentList || []).map(fromWireValue);
+
+    const [id, payload] = ev.data as PostMessageMessage;
+
+    const path = payload?.path ?? [];
+    const type = payload.type;
+
     let returnValue;
     try {
       const parent = path.slice(0, -1).reduce(objProp, obj);
       const rawValue = path.reduce(objProp, obj);
       switch (type) {
-        case MessageType.GET:
+        case PostMessageType.GET:
           {
             returnValue = rawValue;
           }
           break;
-        case MessageType.SET:
+        case PostMessageType.SET:
           {
-            parent[path.slice(-1)[0]] = fromWireValue(ev.data.value);
+            parent[path.slice(-1)[0]] = fromWireValue(payload.value);
             returnValue = true;
           }
           break;
-        case MessageType.APPLY:
+        case PostMessageType.APPLY:
           {
+            const argumentList = (payload.argumentList ?? []).map(fromWireValue);
             returnValue = rawValue.apply(parent, argumentList);
           }
           break;
-        case MessageType.CONSTRUCT:
+        case PostMessageType.CONSTRUCT:
           {
+            const argumentList = (payload.argumentList ?? []).map(fromWireValue);
             const value = new rawValue(...argumentList);
             returnValue = proxy(value);
           }
           break;
-        case MessageType.ENDPOINT:
+        case PostMessageType.ENDPOINT:
           {
             const { port1, port2 } = new MessageChannel();
             expose(obj, port2);
             returnValue = transfer(port1, [port1]);
           }
           break;
-        case MessageType.RELEASE:
+        case PostMessageType.RELEASE:
           {
             returnValue = undefined;
           }
@@ -368,8 +373,8 @@ export function expose(
       })
       .then((returnValue) => {
         const [wireValue, transferables] = toWireValue(returnValue);
-        ep.postMessage({ ...wireValue, id }, transferables);
-        if (type === MessageType.RELEASE) {
+        ep.postMessage([id, wireValue], transferables);
+        if (type === PostMessageType.RELEASE) {
           // detach and deactive after sending release response above.
           ep.removeEventListener("message", callback as any);
           closeEndPoint(ep);
@@ -384,7 +389,7 @@ export function expose(
           value: new TypeError("Unserializable return value"),
           [throwMarker]: 0,
         });
-        ep.postMessage({ ...wireValue, id }, transferables);
+        ep.postMessage([id, wireValue], transferables);
       });
   } as any);
   if (ep.start) {
@@ -392,11 +397,11 @@ export function expose(
   }
 }
 
-function isMessagePort(endpoint: Endpoint): endpoint is MessagePort {
+function isMessagePort(endpoint: Endpoint | ExposedEndpoint): endpoint is MessagePort {
   return endpoint.constructor.name === "MessagePort";
 }
 
-function closeEndPoint(endpoint: Endpoint) {
+function closeEndPoint(endpoint: Endpoint | ExposedEndpoint) {
   if (isMessagePort(endpoint)) endpoint.close();
 }
 
@@ -430,7 +435,7 @@ function throwIfProxyReleased(isReleased: boolean) {
 }
 
 function releaseEndpoint(epWithPendingListeners: EndpointWithPendingListeners) {
-  return requestResponseMessage(epWithPendingListeners, MessageType.RELEASE).then(() => {
+  return requestResponseMessage(epWithPendingListeners, { type: PostMessageType.RELEASE }).then(() => {
     closeEndPoint(epWithPendingListeners.endpoint);
   });
 }
@@ -506,7 +511,8 @@ function createProxy<T>(
         if (path.length === 0) {
           return { then: () => proxy };
         }
-        const r = requestResponseMessage(epWithPendingListeners, MessageType.GET, {
+        const r = requestResponseMessage(epWithPendingListeners, {
+          type: PostMessageType.GET,
           path: path.map(toString),
         }).then(fromWireValue);
         return r.then.bind(r);
@@ -528,8 +534,8 @@ function createProxy<T>(
       const [value, transferables] = toWireValue(rawValue);
       return requestResponseMessage(
         epWithPendingListeners,
-        MessageType.SET,
         {
+          type: PostMessageType.SET,
           path: [...path, prop].map(toString),
           value,
         },
@@ -540,7 +546,7 @@ function createProxy<T>(
       throwIfProxyReleased(isProxyReleased);
       const last = path[path.length - 1];
       if ((last as any) === createEndpoint) {
-        return requestResponseMessage(epWithPendingListeners, MessageType.ENDPOINT).then(fromWireValue);
+        return requestResponseMessage(epWithPendingListeners, { type: PostMessageType.ENDPOINT }).then(fromWireValue);
       }
       // We just pretend that `bind()` didn’t happen.
       if (last === "bind") {
@@ -549,8 +555,8 @@ function createProxy<T>(
       const [argumentList, transferables] = processArguments(rawArgumentList);
       return requestResponseMessage(
         epWithPendingListeners,
-        MessageType.APPLY,
         {
+          type: PostMessageType.APPLY,
           path: path.map(toString),
           argumentList,
         },
@@ -562,8 +568,8 @@ function createProxy<T>(
       const [argumentList, transferables] = processArguments(rawArgumentList);
       return requestResponseMessage(
         epWithPendingListeners,
-        MessageType.CONSTRUCT,
         {
+          type: PostMessageType.CONSTRUCT,
           path: path.map(toString),
           argumentList,
         },
@@ -652,8 +658,7 @@ function fromWireValue(value: WireValue): any {
 
 function requestResponseMessage(
   epWithPendingListeners: EndpointWithPendingListeners,
-  type: MessageType,
-  msg?: Message,
+  payload: Payload,
   transfers?: Transferable[]
 ): Promise<WireValue> {
   const ep = epWithPendingListeners.endpoint;
@@ -664,7 +669,7 @@ function requestResponseMessage(
     if (ep.start) {
       ep.start();
     }
-    ep.postMessage({ id, ...msg }, transfers);
+    ep.postMessage([id, payload], transfers);
   });
 }
 
