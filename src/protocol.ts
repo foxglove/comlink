@@ -27,7 +27,7 @@ export interface PostMessageWithOrigin {
 }
 
 export interface Endpoint extends EventSource {
-  postMessage(message: any, transfer?: Transferable[]): void;
+  postMessage(message: WireValue, transfer?: Transferable[]): void;
 
   start?: () => void;
 }
