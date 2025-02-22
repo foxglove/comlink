@@ -320,8 +320,8 @@ export function expose(
     const argumentList = (ev.data.argumentList || []).map(fromWireValue);
     let returnValue;
     try {
-      const parent = path.slice(0, -1).reduce((obj, prop) => obj[prop], obj);
-      const rawValue = path.reduce((obj, prop) => obj[prop], obj);
+      const parent = path.slice(0, -1).reduce(objProp, obj);
+      const rawValue = path.reduce(objProp, obj);
       switch (type) {
         case MessageType.GET:
           {
@@ -511,7 +511,7 @@ function createProxy<T>(
         }
         const r = requestResponseMessage(epWithPendingListeners, {
           type: MessageType.GET,
-          path: path.map((p) => p.toString()),
+          path: path.map(toString),
         }).then(fromWireValue);
         return r.then.bind(r);
       }
@@ -534,7 +534,7 @@ function createProxy<T>(
         epWithPendingListeners,
         {
           type: MessageType.SET,
-          path: [...path, prop].map((p) => p.toString()),
+          path: [...path, prop].map(toString),
           value,
         },
         transferables
@@ -557,7 +557,7 @@ function createProxy<T>(
         epWithPendingListeners,
         {
           type: MessageType.APPLY,
-          path: path.map((p) => p.toString()),
+          path: path.map(toString),
           argumentList,
         },
         transferables
@@ -570,7 +570,7 @@ function createProxy<T>(
         epWithPendingListeners,
         {
           type: MessageType.CONSTRUCT,
-          path: path.map((p) => p.toString()),
+          path: path.map(toString),
           argumentList,
         },
         transferables
@@ -585,9 +585,19 @@ function myFlat<T>(arr: (T | T[])[]): T[] {
   return Array.prototype.concat.apply([], arr);
 }
 
+/** Get the first item of a tuple */
+function firstItem<T>(v: [T, unknown]): T {
+  return v[0]
+}
+
+/** Get the second item of a tuple */
+function secondItem<T>(v: [unknown, T]): T {
+  return v[1];
+}
+
 function processArguments(argumentList: any[]): [WireValue[], Transferable[]] {
   const processed = argumentList.map(toWireValue);
-  return [processed.map((v) => v[0]), myFlat(processed.map((v) => v[1]))];
+  return [processed.map(firstItem), myFlat(processed.map(secondItem))];
 }
 
 const transferCache = new WeakMap<any, Transferable[]>();
@@ -660,4 +670,14 @@ function requestResponseMessage(
     }
     ep.postMessage({ id, ...msg }, transfers);
   });
+}
+
+/// --- functions for use with .map and .reduce above --- ///
+
+function toString<T extends { toString(): string }>(p: T): string {
+  return p.toString();
+}
+
+function objProp<T extends object, K extends keyof T>(obj: T, prop: K): T[K] {
+  return obj[prop];
 }
