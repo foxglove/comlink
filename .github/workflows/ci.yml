@@ -21,6 +21,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4.4.0
+        with:
+          # Needed for NODE_AUTH_TOKEN env var to work for npm publish
+          # https://github.com/actions/setup-node#:~:text=NODE_AUTH_TOKEN.%0A%20%20%20%20%23%20Default%3A%20%27%27-,registry,-%2Durl%3A%20%27
+          registry-url: https://registry.npmjs.org
 
       - run: npm install
 
