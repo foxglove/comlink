@@ -379,7 +379,7 @@ export function expose(
           }
         }
       })
-      .catch((error) => {
+      .catch((_error) => {
         // Send Serialization Error To Caller
         const [wireValue, transferables] = toWireValue({
           value: new TypeError("Unserializable return value"),
