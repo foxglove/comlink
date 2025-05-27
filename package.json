@@ -21,7 +21,7 @@
     "email": "surma@google.com"
   },
   "files": [
-    "dist"
+    "src"
   ],
   "repository": {
     "type": "git",
