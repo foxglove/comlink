@@ -256,6 +256,7 @@ const throwTransferHandler: TransferHandler<
           message: value.message,
           name: value.name,
           stack: value.stack,
+          cause: value.cause,
         },
       };
     } else {
@@ -266,7 +267,7 @@ const throwTransferHandler: TransferHandler<
   deserialize(serialized) {
     if (serialized.isError) {
       throw Object.assign(
-        new Error(serialized.value.message),
+        new Error(serialized.value.message, { cause: serialized.value.cause }),
         serialized.value
       );
     }

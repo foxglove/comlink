@@ -98,11 +98,11 @@ describe("Comlink in the same realm", function () {
     expect(await thing.x).to.be.undefined;
   });
 
-  it("can keep the stack and message of thrown errors", async function () {
+  it("can keep the stack, message and cause of thrown errors", async function () {
     let stack;
     const thing = Comlink.wrap(this.port1);
     Comlink.expose((_) => {
-      const error = Error("OMG");
+      const error = Error("OMG", { cause: "the cause" });
       stack = error.stack;
       throw error;
     }, this.port2);
@@ -113,6 +113,7 @@ describe("Comlink in the same realm", function () {
       expect(err).to.not.eq("Should have thrown");
       expect(err.message).to.equal("OMG");
       expect(err.stack).to.equal(stack);
+      expect(err.cause).to.equal("the cause");
     }
   });
 
