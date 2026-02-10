@@ -422,7 +422,11 @@ export function wrap<T>(ep: Endpoint, target?: any): Remote<T> {
     }
   });
 
-  return createProxy<T>({ endpoint: ep, pendingListeners, nextRequestId: 1 }, [], target) as any;
+  return createProxy<T>(
+    { endpoint: ep, pendingListeners, nextRequestId: 1 },
+    [],
+    target
+  ) as any;
 }
 
 function throwIfProxyReleased(isReleased: boolean) {
@@ -588,7 +592,7 @@ function myFlat<T>(arr: (T | T[])[]): T[] {
 
 /** Get the first item of a tuple */
 function firstItem<T>(v: [T, unknown]): T {
-  return v[0]
+  return v[0];
 }
 
 /** Get the second item of a tuple */
