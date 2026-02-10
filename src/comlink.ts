@@ -256,6 +256,7 @@ const throwTransferHandler: TransferHandler<
           message: value.message,
           name: value.name,
           stack: value.stack,
+          cause: value.cause,
         },
       };
     } else {
