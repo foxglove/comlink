@@ -16,6 +16,8 @@ import {
 } from "./protocol";
 export type { Endpoint };
 
+const EMPTY_PATH: readonly string[] = Object.freeze([]);
+
 export const proxyMarker = Symbol("Comlink.proxy");
 export const createEndpoint = Symbol("Comlink.endpoint");
 export const releaseProxy = Symbol("Comlink.releaseProxy");
@@ -315,7 +317,7 @@ export function expose(
       return;
     }
     const { id, type } = ev.data as Message;
-    const path = (ev.data as Message & { path?: string[] }).path ?? [];
+    const path = (ev.data as Message & { path?: string[] }).path ?? EMPTY_PATH;
     let returnValue;
     try {
       let parent = obj;
