@@ -595,23 +595,19 @@ function createProxy<T>(
   return proxy as any;
 }
 
-function myFlat<T>(arr: (T | T[])[]): T[] {
-  return Array.prototype.concat.apply([], arr);
-}
-
-/** Get the first item of a tuple */
-function firstItem<T>(v: [T, unknown]): T {
-  return v[0];
-}
-
-/** Get the second item of a tuple */
-function secondItem<T>(v: [unknown, T]): T {
-  return v[1];
-}
-
 function processArguments(argumentList: any[]): [WireValue[], Transferable[]] {
-  const processed = argumentList.map(toWireValue);
-  return [processed.map(firstItem), myFlat(processed.map(secondItem))];
+  const wireValues: WireValue[] = [];
+  const transferables: Transferable[] = [];
+
+  for (const argument of argumentList) {
+    const [wireValue, transfers] = toWireValue(argument);
+    wireValues.push(wireValue);
+    for (const transferable of transfers) {
+      transferables.push(transferable);
+    }
+  }
+
+  return [wireValues, transferables];
 }
 
 const transferCache = new WeakMap<any, Transferable[]>();
