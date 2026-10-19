@@ -314,15 +314,15 @@ export function expose(
       console.warn(`Invalid origin '${ev.origin}' for comlink proxy`);
       return;
     }
-    const { id, type, path } = {
-      path: [] as string[],
-      ...(ev.data as Message),
-    };
-    const argumentList = (ev.data.argumentList || []).map(fromWireValue);
+    const { id, type } = ev.data as Message;
+    const path = (ev.data as Message & { path?: string[] }).path ?? [];
     let returnValue;
     try {
-      const parent = path.slice(0, -1).reduce(objProp, obj);
-      const rawValue = path.reduce(objProp, obj);
+      let parent = obj;
+      for (let i = 0; i < path.length - 1; i++) {
+        parent = parent[path[i]!];
+      }
+      const rawValue = path.length > 0 ? parent[path[path.length - 1]!] : obj;
       switch (type) {
         case MessageType.GET:
           {
@@ -337,11 +337,13 @@ export function expose(
           break;
         case MessageType.APPLY:
           {
+            const argumentList = (ev.data.argumentList || []).map(fromWireValue);
             returnValue = rawValue.apply(parent, argumentList);
           }
           break;
         case MessageType.CONSTRUCT:
           {
+            const argumentList = (ev.data.argumentList || []).map(fromWireValue);
             const value = new rawValue(...argumentList);
             returnValue = proxy(value);
           }
@@ -683,6 +685,3 @@ function toString<T extends { toString(): string }>(p: T): string {
   return p.toString();
 }
 
-function objProp<T extends object, K extends keyof T>(obj: T, prop: K): T[K] {
-  return obj[prop];
-}
