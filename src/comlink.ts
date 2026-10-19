@@ -17,6 +17,7 @@ import {
 export type { Endpoint };
 
 const EMPTY_PATH: readonly string[] = Object.freeze([]);
+const EMPTY_ARGUMENTS: readonly unknown[] = Object.freeze([]);
 
 export const proxyMarker = Symbol("Comlink.proxy");
 export const createEndpoint = Symbol("Comlink.endpoint");
@@ -339,13 +340,17 @@ export function expose(
           break;
         case MessageType.APPLY:
           {
-            const argumentList = (ev.data.argumentList || []).map(fromWireValue);
+            const argumentList = ev.data.argumentList?.length
+              ? ev.data.argumentList.map(fromWireValue)
+              : EMPTY_ARGUMENTS;
             returnValue = rawValue.apply(parent, argumentList);
           }
           break;
         case MessageType.CONSTRUCT:
           {
-            const argumentList = (ev.data.argumentList || []).map(fromWireValue);
+            const argumentList = ev.data.argumentList?.length
+              ? ev.data.argumentList.map(fromWireValue)
+              : EMPTY_ARGUMENTS;
             const value = new rawValue(...argumentList);
             returnValue = proxy(value);
           }
